@@ -21,6 +21,7 @@ export const Overview: React.FC = () => {
   const {
     subjects,
     budget,
+    currency,
     transactions,
     events,
     habits,
@@ -35,7 +36,7 @@ export const Overview: React.FC = () => {
   // 1. Dual Attendance % (Aggregate & Subject-wise)
   const dual = calculateDualAttendance(subjects);
 
-  // 2. Monthly Spending vs Budget (in INR)
+  // 2. Monthly Spending vs Budget
   const currentMonth = new Date().toISOString().substring(0, 7); // e.g. "2026-09"
   const currentMonthTransactions = transactions.filter((t) => t.date.startsWith(currentMonth));
   const monthlyExpenses = currentMonthTransactions
@@ -43,7 +44,7 @@ export const Overview: React.FC = () => {
     .reduce((sum, t) => sum + t.amount, 0);
   const monthlyIncome = currentMonthTransactions
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0) || 8000;
+    .reduce((sum, t) => sum + t.amount, 0);
   
   const budgetSpentPct = budget > 0 ? Math.min(Math.round((monthlyExpenses / budget) * 100), 100) : 0;
 
@@ -158,10 +159,10 @@ export const Overview: React.FC = () => {
         >
           <p className="text-xs text-zinc-500 uppercase font-bold tracking-tighter">Monthly Spending</p>
           <p className="text-2xl font-bold text-zinc-100 mt-1 font-mono">
-            {formatCurrency(monthlyExpenses || 2850)}
+            {formatCurrency(monthlyExpenses, currency)}
           </p>
           <p className="text-xs text-amber-500 mt-1 font-mono">
-            {budgetSpentPct || 28}% of {formatCurrency(budget || 10000)} budget
+            {budgetSpentPct}% of {formatCurrency(budget, currency)} budget
           </p>
         </div>
 
@@ -384,13 +385,13 @@ export const Overview: React.FC = () => {
               <div className="p-2 bg-zinc-900 rounded">
                 <p className="text-[10px] text-zinc-500 font-mono">Total Income</p>
                 <p className="text-sm font-bold text-emerald-400 font-mono">
-                  {formatCurrency(monthlyIncome || 8000)}
+                  {formatCurrency(monthlyIncome, currency)}
                 </p>
               </div>
               <div className="p-2 bg-zinc-900 rounded">
                 <p className="text-[10px] text-zinc-500 font-mono">Total Expenses</p>
                 <p className="text-sm font-bold text-rose-400 font-mono">
-                  {formatCurrency(monthlyExpenses || 2850)}
+                  {formatCurrency(monthlyExpenses, currency)}
                 </p>
               </div>
             </div>
@@ -399,7 +400,7 @@ export const Overview: React.FC = () => {
               {Object.entries(expenseByCategory).slice(0, 3).map(([cat, amount]) => (
                 <div key={cat} className="flex justify-between items-center text-xs">
                   <span className="text-zinc-400">{cat}</span>
-                  <span className="font-bold text-zinc-200 font-mono">{formatCurrency(amount)}</span>
+                  <span className="font-bold text-zinc-200 font-mono">{formatCurrency(amount, currency)}</span>
                 </div>
               ))}
             </div>

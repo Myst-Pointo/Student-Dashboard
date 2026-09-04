@@ -14,12 +14,11 @@ import {
   INITIAL_OFFICIAL_MILESTONES,
   INITIAL_SUBJECTS,
 } from '../data/academicData';
-import { getTodayDateString } from './dashboardUtils';
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
-  displayName: 'Shira Raghuwanshi',
+  displayName: 'Student',
   semester: 'Semester 1',
-  year: '1st Year (2026–2027)',
+  year: '1st Year',
   targetAttendance: 75,
 };
 
@@ -28,6 +27,7 @@ export interface StoredDashboardData {
   events: AcademicEvent[];
   transactions: Transaction[];
   budget: number;
+  currency: string;
   habits: Record<string, HabitRecord>;
   milestones: LearningMilestone[];
   userProfile: UserProfile;
@@ -35,8 +35,9 @@ export interface StoredDashboardData {
   lastUpdated: string;
 }
 
-const PRIMARY_STORAGE_KEY = 'academic_dashboard_student_v3';
+const PRIMARY_STORAGE_KEY = 'academic_dashboard_student_v4';
 const LEGACY_STORAGE_KEYS = [
+  'academic_dashboard_student_v3',
   'academic_life_dashboard_global_store_v2',
   'academic_life_dashboard_global_store',
 ];
@@ -45,84 +46,16 @@ const LEGACY_STORAGE_KEYS = [
 let memoryCache: StoredDashboardData | null = null;
 
 export function getDefaultDashboardData(): StoredDashboardData {
-  const subjectsWithIds: Subject[] = INITIAL_SUBJECTS.map((s, i) => ({
-    id: `subj_init_${i + 1}`,
-    ...s,
-    updatedAt: new Date().toISOString(),
-  }));
-
-  const eventsWithIds: AcademicEvent[] = INITIAL_ACADEMIC_EVENTS.map((e, i) => ({
-    id: `event_init_${i + 1}`,
-    ...e,
-  }));
-
-  const milestonesWithIds: LearningMilestone[] = INITIAL_MILESTONES.map((m, i) => ({
-    id: `ms_init_${i + 1}`,
-    ...m,
-    updatedAt: new Date().toISOString(),
-  }));
-
-  const sampleTxs: Transaction[] = [
-    {
-      id: 'tx_init_1',
-      type: 'expense',
-      amount: 850,
-      category: 'Books',
-      date: '2026-09-01',
-      notes: 'Microeconomics Textbook',
-      createdAt: '2026-09-01T10:00:00.000Z',
-    },
-    {
-      id: 'tx_init_2',
-      type: 'expense',
-      amount: 320,
-      category: 'Food',
-      date: '2026-09-02',
-      notes: 'Campus Cafeteria Lunch',
-      createdAt: '2026-09-02T13:00:00.000Z',
-    },
-    {
-      id: 'tx_init_3',
-      type: 'expense',
-      amount: 450,
-      category: 'Commute',
-      date: '2026-09-02',
-      notes: 'Metro Card Reload',
-      createdAt: '2026-09-02T17:00:00.000Z',
-    },
-    {
-      id: 'tx_init_4',
-      type: 'income',
-      amount: 8000,
-      category: 'Income',
-      date: '2026-09-01',
-      notes: 'Academic Assistant Stipend',
-      createdAt: '2026-09-01T09:00:00.000Z',
-    },
-  ];
-
-  const today = getTodayDateString();
-  const initialHabits: Record<string, HabitRecord> = {
-    [today]: {
-      date: today,
-      workout: true,
-      waterGlasses: 6,
-      waterGoalMet: false,
-      studyHours: 3.5,
-      studyGoalMet: true,
-      workoutNotes: 'Upper Body & Core',
-    },
-  };
-
   return {
-    subjects: subjectsWithIds,
-    events: eventsWithIds,
-    transactions: sampleTxs,
-    budget: 10000,
-    habits: initialHabits,
-    milestones: milestonesWithIds,
+    subjects: [],
+    events: [],
+    transactions: [],
+    budget: 2000,
+    currency: 'USD',
+    habits: {},
+    milestones: [],
     userProfile: DEFAULT_USER_PROFILE,
-    officialMilestones: INITIAL_OFFICIAL_MILESTONES,
+    officialMilestones: [],
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -131,8 +64,17 @@ function sanitizeUserProfile(profile: any): UserProfile {
   if (!profile || typeof profile !== 'object') {
     return DEFAULT_USER_PROFILE;
   }
+  let name = typeof profile.displayName === 'string' && profile.displayName.trim()
+    ? profile.displayName.trim()
+    : DEFAULT_USER_PROFILE.displayName;
+
+  // Ensure personal user name never leaks to new or reset sessions
+  if (name.toLowerCase().includes('shira') || name.toLowerCase().includes('raghuwanshi')) {
+    name = 'Student';
+  }
+
   return {
-    displayName: typeof profile.displayName === 'string' && profile.displayName.trim() ? profile.displayName.trim() : DEFAULT_USER_PROFILE.displayName,
+    displayName: name,
     semester: typeof profile.semester === 'string' && profile.semester.trim() ? profile.semester.trim() : DEFAULT_USER_PROFILE.semester,
     year: typeof profile.year === 'string' && profile.year.trim() ? profile.year.trim() : DEFAULT_USER_PROFILE.year,
     targetAttendance: typeof profile.targetAttendance === 'number' && !isNaN(profile.targetAttendance) && profile.targetAttendance >= 1 && profile.targetAttendance <= 100 ? profile.targetAttendance : 75,
@@ -140,11 +82,43 @@ function sanitizeUserProfile(profile: any): UserProfile {
   };
 }
 
+function sanitizeCurrency(currency: any): string {
+  if (typeof currency === 'string' && currency.trim()) {
+    return currency.trim().toUpperCase();
+  }
+  return 'USD';
+}
+
+function filterPersonalData(subjects: Subject[]): Subject[] {
+  if (!Array.isArray(subjects)) return [];
+  // Ensure personal professors or subjects from earlier development testing are purged
+  return subjects.filter((s) => {
+    const prof = (s.professor || '').toLowerCase();
+    return !prof.includes('togya') &&
+      !prof.includes('phatak') &&
+      !prof.includes('shaktawat') &&
+      !prof.includes('pahuja') &&
+      !prof.includes('sirwaiya');
+  });
+}
+
+function filterPersonalEvents(events: AcademicEvent[]): AcademicEvent[] {
+  if (!Array.isArray(events)) return [];
+  return events.filter((e) => {
+    const title = (e.title || '').toLowerCase();
+    const notes = (e.notes || '').toLowerCase();
+    return !title.includes('sfoorti') && !notes.includes('sfoorti');
+  });
+}
+
 function sanitizeOfficialMilestones(milestones: any): OfficialAcademicMilestone[] {
   if (Array.isArray(milestones) && milestones.length > 0) {
-    return milestones;
+    return milestones.filter((m) => {
+      const title = (m.title || '').toLowerCase();
+      return !title.includes('sfoorti') && !title.includes('diwali vacations');
+    });
   }
-  return INITIAL_OFFICIAL_MILESTONES;
+  return [];
 }
 
 /**
@@ -163,10 +137,11 @@ export function loadLocalData(userId?: string): StoredDashboardData {
       const parsed = JSON.parse(primaryRaw);
       if (parsed && typeof parsed === 'object') {
         const validated: StoredDashboardData = {
-          subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
-          events: Array.isArray(parsed.events) ? parsed.events : [],
+          subjects: filterPersonalData(parsed.subjects),
+          events: filterPersonalEvents(parsed.events),
           transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-          budget: typeof parsed.budget === 'number' ? parsed.budget : 10000,
+          budget: typeof parsed.budget === 'number' ? parsed.budget : 2000,
+          currency: sanitizeCurrency(parsed.currency),
           habits: parsed.habits && typeof parsed.habits === 'object' ? parsed.habits : {},
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
           userProfile: sanitizeUserProfile(parsed.userProfile),
@@ -185,10 +160,11 @@ export function loadLocalData(userId?: string): StoredDashboardData {
         const parsed = JSON.parse(userRaw);
         if (parsed && typeof parsed === 'object') {
           const validated: StoredDashboardData = {
-            subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
-            events: Array.isArray(parsed.events) ? parsed.events : [],
+            subjects: filterPersonalData(parsed.subjects),
+            events: filterPersonalEvents(parsed.events),
             transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-            budget: typeof parsed.budget === 'number' ? parsed.budget : 10000,
+            budget: typeof parsed.budget === 'number' ? parsed.budget : 2000,
+            currency: sanitizeCurrency(parsed.currency),
             habits: parsed.habits && typeof parsed.habits === 'object' ? parsed.habits : {},
             milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
             userProfile: sanitizeUserProfile(parsed.userProfile),
@@ -209,10 +185,11 @@ export function loadLocalData(userId?: string): StoredDashboardData {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           const validated: StoredDashboardData = {
-            subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
-            events: Array.isArray(parsed.events) ? parsed.events : [],
+            subjects: filterPersonalData(parsed.subjects),
+            events: filterPersonalEvents(parsed.events),
             transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-            budget: typeof parsed.budget === 'number' ? parsed.budget : 10000,
+            budget: typeof parsed.budget === 'number' ? parsed.budget : 2000,
+            currency: sanitizeCurrency(parsed.currency),
             habits: parsed.habits && typeof parsed.habits === 'object' ? parsed.habits : {},
             milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
             userProfile: sanitizeUserProfile(parsed.userProfile),
@@ -225,42 +202,11 @@ export function loadLocalData(userId?: string): StoredDashboardData {
         }
       }
     }
-
-    // 4. Scan for any existing user keys in localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith('academic_life_dashboard_') || key.startsWith('academic_dash_'))) {
-        try {
-          const item = localStorage.getItem(key);
-          if (item) {
-            const parsed = JSON.parse(item);
-            if (parsed && Array.isArray(parsed.subjects)) {
-              const validated: StoredDashboardData = {
-                subjects: parsed.subjects || [],
-                events: Array.isArray(parsed.events) ? parsed.events : [],
-                transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-                budget: typeof parsed.budget === 'number' ? parsed.budget : 10000,
-                habits: parsed.habits && typeof parsed.habits === 'object' ? parsed.habits : {},
-                milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
-                userProfile: sanitizeUserProfile(parsed.userProfile),
-                officialMilestones: sanitizeOfficialMilestones(parsed.officialMilestones),
-                lastUpdated: parsed.lastUpdated || new Date().toISOString(),
-              };
-              memoryCache = validated;
-              localStorage.setItem(PRIMARY_STORAGE_KEY, JSON.stringify(validated));
-              return validated;
-            }
-          }
-        } catch {
-          // Continue scanning
-        }
-      }
-    }
   } catch (err) {
     console.warn('Failed to load local dashboard data from localStorage:', err);
   }
 
-  // 5. Only if absolutely no prior data was found anywhere, initialize default data
+  // 4. Fallback to clean default initial state
   const defaultData = getDefaultDashboardData();
   memoryCache = defaultData;
   try {
@@ -281,7 +227,6 @@ export function loadLocalData(userId?: string): StoredDashboardData {
  */
 export function saveLocalData(userId: string | undefined, data: Partial<StoredDashboardData>): void {
   try {
-    // Current base from cache or raw storage
     let current = memoryCache;
     if (!current) {
       try {
@@ -302,6 +247,7 @@ export function saveLocalData(userId: string | undefined, data: Partial<StoredDa
       events: data.events !== undefined ? data.events : current.events,
       transactions: data.transactions !== undefined ? data.transactions : current.transactions,
       budget: data.budget !== undefined ? data.budget : current.budget,
+      currency: data.currency !== undefined ? sanitizeCurrency(data.currency) : current.currency,
       habits: data.habits !== undefined ? data.habits : current.habits,
       milestones: data.milestones !== undefined ? data.milestones : current.milestones,
       userProfile: data.userProfile !== undefined ? data.userProfile : current.userProfile,
@@ -313,7 +259,6 @@ export function saveLocalData(userId: string | undefined, data: Partial<StoredDa
     const json = JSON.stringify(updated);
 
     localStorage.setItem(PRIMARY_STORAGE_KEY, json);
-    localStorage.setItem('academic_life_dashboard_global_store_v2', json);
     if (userId) {
       localStorage.setItem(`academic_life_dashboard_user_${userId}`, json);
     }
@@ -321,4 +266,3 @@ export function saveLocalData(userId: string | undefined, data: Partial<StoredDa
     console.warn('Failed to save local dashboard data to localStorage:', err);
   }
 }
-

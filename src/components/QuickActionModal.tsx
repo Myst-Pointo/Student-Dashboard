@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { ExpenseCategory } from '../types';
-import { getTodayDateString } from '../utils/dashboardUtils';
+import { getCurrencySymbol, getTodayDateString } from '../utils/dashboardUtils';
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -25,6 +25,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 }) => {
   const {
     subjects,
+    currency,
     recordAttendance,
     addTransaction,
     toggleWorkout,
@@ -203,13 +204,14 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <form onSubmit={handleExpenseSubmit} className="space-y-3 text-xs">
             <div>
               <label className="block font-semibold text-zinc-400 mb-1">
-                Amount (₹) *
+                Amount ({getCurrencySymbol(currency)}) *
               </label>
               <input
                 type="number"
-                step="1"
+                min="0.01"
+                step="any"
                 required
-                placeholder="0"
+                placeholder="0.00"
                 value={expenseAmount}
                 onChange={(e) => setExpenseAmount(e.target.value)}
                 className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 font-mono text-sm focus:outline-hidden focus:border-indigo-500"

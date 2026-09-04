@@ -10,14 +10,18 @@ import {
   Sparkles,
   AlertCircle,
   LogIn,
+  Coins,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { googleSignIn } from '../firebase';
+import { ALL_CURRENCIES } from '../data/currencies';
 
 export function UserProfileModal() {
   const {
     user,
     userProfile,
+    currency,
+    setCurrency,
     updateUserProfile,
     profileModalOpen,
     setProfileModalOpen,
@@ -29,6 +33,7 @@ export function UserProfileModal() {
   const [targetAttendance, setTargetAttendance] = useState<number>(
     userProfile?.targetAttendance || 75
   );
+  const [selectedCurrency, setSelectedCurrency] = useState(currency || 'USD');
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -39,9 +44,10 @@ export function UserProfileModal() {
       setSemester(userProfile.semester || 'Semester 1');
       setYear(userProfile.year || '1st Year (2026–2027)');
       setTargetAttendance(userProfile.targetAttendance || 75);
+      setSelectedCurrency(currency || 'USD');
       setSavedSuccess(false);
     }
-  }, [profileModalOpen, userProfile, user]);
+  }, [profileModalOpen, userProfile, user, currency]);
 
   if (!profileModalOpen) return null;
 
@@ -49,12 +55,15 @@ export function UserProfileModal() {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateUserProfile({
-        displayName: displayName.trim() || 'Student',
-        semester: semester.trim(),
-        year: year.trim(),
-        targetAttendance: Math.min(100, Math.max(1, Number(targetAttendance) || 75)),
-      });
+      await Promise.all([
+        updateUserProfile({
+          displayName: displayName.trim() || 'Student',
+          semester: semester.trim(),
+          year: year.trim(),
+          targetAttendance: Math.min(100, Math.max(1, Number(targetAttendance) || 75)),
+        }),
+        setCurrency(selectedCurrency),
+      ]);
       setSavedSuccess(true);
       setTimeout(() => {
         setSavedSuccess(false);
@@ -158,7 +167,7 @@ export function UserProfileModal() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
-              placeholder="e.g. Shira Raghuwanshi"
+              placeholder="e.g. Student Name"
               className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
             <p className="text-[11px] text-slate-400 mt-1">
@@ -166,7 +175,7 @@ export function UserProfileModal() {
             </p>
           </div>
 
-          {/* Academic Semester & Year */}
+          {/* Academic Semester, Year & Currency */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -202,6 +211,28 @@ export function UserProfileModal() {
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
+          </div>
+
+          {/* Financial Tracking Currency Selection */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Financial Tracking Currency (All World Currencies Available)
+            </label>
+            <select
+              value={selectedCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
+            >
+              {ALL_CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} ({c.symbol}) — {c.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Select any global currency for budget tracking, monthly limits, and transactions.
+            </p>
           </div>
 
           {/* Target Attendance Goal (%) */}

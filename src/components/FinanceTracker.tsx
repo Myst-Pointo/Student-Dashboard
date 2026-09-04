@@ -1,27 +1,23 @@
 import React, { useState } from 'react';
 import {
   Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
   Plus,
   Trash2,
   PieChart,
-  IndianRupee,
-  TrendingDown,
-  TrendingUp,
-  Tag,
-  Calendar,
-  CreditCard,
   Edit3,
+  Globe,
+  Coins,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
-import { formatCurrency } from '../utils/dashboardUtils';
+import { formatCurrency, getCurrencySymbol } from '../utils/dashboardUtils';
 import { ExpenseCategory } from '../types';
+import { CurrencyModal } from './CurrencyModal';
 
 export const FinanceTracker: React.FC = () => {
   const {
     transactions,
     budget,
+    currency,
     addTransaction,
     deleteTransaction,
     updateBudget,
@@ -29,6 +25,7 @@ export const FinanceTracker: React.FC = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [budgetModalOpen, setBudgetModalOpen] = useState(false);
+  const [currencyModalOpen, setCurrencyModalOpen] = useState(false);
   const [newBudgetVal, setNewBudgetVal] = useState(budget.toString());
 
   const [txType, setTxType] = useState<'expense' | 'income'>('expense');
@@ -47,10 +44,12 @@ export const FinanceTracker: React.FC = () => {
 
   const totalIncome = currentMonthTx
     .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0) || 500;
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const remainingBudget = Math.max(0, budget - totalExpense);
   const budgetSpentPct = budget > 0 ? Math.min(Math.round((totalExpense / budget) * 100), 100) : 0;
+
+  const currSymbol = getCurrencySymbol(currency);
 
   // Category breakdown
   const categoryTotals: Record<ExpenseCategory, number> = {
@@ -101,6 +100,37 @@ export const FinanceTracker: React.FC = () => {
 
   return (
     <div className="space-y-4" id="finance-module">
+      {/* Header bar with Currency selector */}
+      <div className="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-[#27272a]/60">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5 text-indigo-400" />
+            Financial Management & Budget Tracking
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            id="open-currency-modal-btn"
+            onClick={() => setCurrencyModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-[#27272a] hover:border-indigo-500/60 text-xs font-mono text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors"
+            title="Click to change tracking currency"
+          >
+            <Coins className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Currency: <strong className="text-indigo-400 font-bold">{currency}</strong> ({currSymbol})</span>
+            <span className="text-[10px] text-zinc-500 underline ml-1">Change</span>
+          </button>
+
+          <button
+            onClick={() => setFormOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Log Transaction
+          </button>
+        </div>
+      </div>
+
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Monthly Budget */}
@@ -119,7 +149,7 @@ export const FinanceTracker: React.FC = () => {
             </button>
           </div>
           <p className="text-2xl font-bold font-mono text-zinc-100 mt-1">
-            {formatCurrency(budget)}
+            {formatCurrency(budget, currency)}
           </p>
           <div className="w-full bg-zinc-800 h-1 rounded mt-2 overflow-hidden">
             <div
@@ -127,14 +157,22 @@ export const FinanceTracker: React.FC = () => {
               style={{ width: `${budgetSpentPct}%` }}
             />
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1 font-mono">{budgetSpentPct}% UTILIZED</p>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500 mt-1 font-mono">
+            <span>{budgetSpentPct}% UTILIZED</span>
+            <button
+              onClick={() => setCurrencyModalOpen(true)}
+              className="text-indigo-400 hover:text-indigo-300"
+            >
+              {currency} ({currSymbol})
+            </button>
+          </div>
         </div>
 
         {/* Card 2: Total Spent */}
         <div className="bg-[#18181b] border border-[#27272a] p-4 rounded-lg">
           <p className="text-xs text-zinc-500 uppercase font-bold tracking-tighter">Total Spent This Month</p>
           <p className="text-2xl font-bold font-mono text-rose-400 mt-1">
-            {formatCurrency(totalExpense)}
+            {formatCurrency(totalExpense, currency)}
           </p>
           <p className="text-xs text-zinc-400 mt-1 font-mono">
             {currentMonthTx.filter((t) => t.type === 'expense').length} transactions recorded
@@ -145,7 +183,7 @@ export const FinanceTracker: React.FC = () => {
         <div className="bg-[#18181b] border border-[#27272a] p-4 rounded-lg">
           <p className="text-xs text-zinc-500 uppercase font-bold tracking-tighter">Remaining Balance</p>
           <p className={`text-2xl font-bold font-mono mt-1 ${remainingBudget < 50 ? 'text-rose-400' : 'text-emerald-400'}`}>
-            {formatCurrency(remainingBudget)}
+            {formatCurrency(remainingBudget, currency)}
           </p>
           <p className="text-xs text-zinc-500 mt-1 font-mono">
             Available until month end
@@ -156,27 +194,28 @@ export const FinanceTracker: React.FC = () => {
         <div className="bg-[#18181b] border border-[#27272a] p-4 rounded-lg">
           <p className="text-xs text-zinc-500 uppercase font-bold tracking-tighter">Total Income Logged</p>
           <p className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalIncome, currency)}
           </p>
           <p className="text-xs text-zinc-500 mt-1 font-mono">
-            Net Savings: {formatCurrency(Math.max(0, totalIncome - totalExpense))}
+            Net Savings: {formatCurrency(Math.max(0, totalIncome - totalExpense), currency)}
           </p>
         </div>
       </div>
 
-      {/* Main Grid: Category Breakdown (4 cols) + Transactions List (8 cols) */}
+      {/* Main Grid: Category Breakdown & Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left Column (4 cols): Category Breakdown & Actions */}
-        <div className="lg:col-span-4 space-y-4">
-          <section className="bg-[#18181b] border border-[#27272a] rounded-lg p-4">
+        {/* Left Column (4 cols): Category Breakdown */}
+        <div className="lg:col-span-4">
+          <section className="bg-[#18181b] border border-[#27272a] rounded-lg p-4 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-black uppercase text-zinc-500 tracking-widest">
-                Spending by Category
+              <h2 className="text-xs font-black uppercase text-zinc-500 tracking-widest flex items-center gap-1.5">
+                <PieChart className="w-3.5 h-3.5 text-indigo-400" />
+                Spending Breakdown
               </h2>
-              <span className="text-[10px] font-mono text-zinc-500">CURRENT MONTH</span>
+              <span className="text-[10px] font-mono text-zinc-500">{currentMonth}</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4 flex-1">
               {(Object.keys(categoryTotals) as ExpenseCategory[]).map((cat) => {
                 const amount = categoryTotals[cat];
                 const pct = totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0;
@@ -187,7 +226,7 @@ export const FinanceTracker: React.FC = () => {
                       <span className="text-zinc-300 font-medium">{cat}</span>
                       <div className="flex items-center gap-2 font-mono">
                         <span className="text-zinc-400">{pct}%</span>
-                        <span className="text-zinc-100 font-bold">{formatCurrency(amount)}</span>
+                        <span className="text-zinc-100 font-bold">{formatCurrency(amount, currency)}</span>
                       </div>
                     </div>
                     <div className="w-full bg-zinc-800 h-1 rounded overflow-hidden">
@@ -231,7 +270,7 @@ export const FinanceTracker: React.FC = () => {
                       <th className="py-2.5 px-3">Type</th>
                       <th className="py-2.5 px-3">Category / Title</th>
                       <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3 text-right">Amount</th>
+                      <th className="py-2.5 px-3 text-right">Amount ({currSymbol})</th>
                       <th className="py-2.5 px-3 text-right">Action</th>
                     </tr>
                   </thead>
@@ -262,7 +301,7 @@ export const FinanceTracker: React.FC = () => {
                               isExp ? 'text-rose-400' : 'text-emerald-400'
                             }`}
                           >
-                            {isExp ? '-' : '+'}{formatCurrency(tx.amount)}
+                            {isExp ? '-' : '+'}{formatCurrency(tx.amount, currency)}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             <button
@@ -279,8 +318,8 @@ export const FinanceTracker: React.FC = () => {
                   </tbody>
                 </table>
               ) : (
-                <div className="py-12 text-center text-zinc-500 text-xs font-mono">
-                  No transactions recorded yet. Click "+ LOG TRANSACTION" to add one.
+                <div className="py-12 text-center text-zinc-500 font-mono text-xs">
+                  No transactions recorded yet. Click &quot;+ Log Transaction&quot; to begin.
                 </div>
               )}
             </div>
@@ -294,7 +333,7 @@ export const FinanceTracker: React.FC = () => {
           <div className="w-full max-w-md bg-[#18181b] border border-[#27272a] rounded-lg p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#27272a]">
               <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-200">
-                Log New Transaction
+                Log New Financial Transaction
               </h3>
               <button
                 onClick={() => setFormOpen(false)}
@@ -306,13 +345,13 @@ export const FinanceTracker: React.FC = () => {
 
             <form onSubmit={handleAddTx} className="space-y-3 text-xs">
               {/* Type Switcher */}
-              <div className="grid grid-cols-2 gap-2 bg-[#09090b] p-1 rounded border border-[#27272a]">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-[#09090b] rounded border border-[#27272a]">
                 <button
                   type="button"
                   onClick={() => setTxType('expense')}
                   className={`py-1.5 rounded font-mono font-bold ${
                     txType === 'expense'
-                      ? 'bg-rose-900/60 text-rose-300'
+                      ? 'bg-rose-950/60 text-rose-300'
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
@@ -323,7 +362,7 @@ export const FinanceTracker: React.FC = () => {
                   onClick={() => setTxType('income')}
                   className={`py-1.5 rounded font-mono font-bold ${
                     txType === 'income'
-                      ? 'bg-emerald-900/60 text-emerald-300'
+                      ? 'bg-emerald-950/60 text-emerald-300'
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
@@ -333,13 +372,14 @@ export const FinanceTracker: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-zinc-400 mb-1">
-                  Amount (₹) *
+                  Amount ({currSymbol}) *
                 </label>
                 <input
                   type="number"
-                  step="1"
+                  min="0.01"
+                  step="any"
                   required
-                  placeholder="0"
+                  placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 font-mono text-sm focus:outline-hidden focus:border-indigo-500"
@@ -380,11 +420,11 @@ export const FinanceTracker: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-zinc-400 mb-1">
-                  Notes / Merchant (Optional)
+                  Notes / Description
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. University bookstore or cafeteria"
+                  placeholder="e.g. Study materials or lunch"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 focus:outline-hidden focus:border-indigo-500"
@@ -429,15 +469,27 @@ export const FinanceTracker: React.FC = () => {
 
             <form onSubmit={handleSaveBudget} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-zinc-400 mb-1">
-                  Monthly Budget Limit (₹)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-zinc-400">
+                    Monthly Budget Limit ({currSymbol})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBudgetModalOpen(false);
+                      setCurrencyModalOpen(true);
+                    }}
+                    className="text-[11px] text-indigo-400 hover:underline"
+                  >
+                    Change Currency ({currency})
+                  </button>
+                </div>
                 <input
                   type="number"
                   required
                   min="1"
-                  step="1"
-                  placeholder="10000"
+                  step="any"
+                  placeholder="2000"
                   value={newBudgetVal}
                   onChange={(e) => setNewBudgetVal(e.target.value)}
                   className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 font-mono text-sm focus:outline-hidden focus:border-indigo-500"
@@ -463,6 +515,12 @@ export const FinanceTracker: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Dedicated Currency Selector Modal */}
+      <CurrencyModal
+        isOpen={currencyModalOpen}
+        onClose={() => setCurrencyModalOpen(false)}
+      />
     </div>
   );
 };

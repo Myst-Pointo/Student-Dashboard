@@ -165,12 +165,30 @@ export function isDueWithin48Hours(dateStr: string, referenceDate: Date = new Da
   }
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+export function getCurrencySymbol(currencyCode: string = 'USD'): string {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode || 'USD',
+    }).formatToParts(0);
+    const symbolPart = parts.find((p) => p.type === 'currency');
+    return symbolPart ? symbolPart.value : (currencyCode || '$');
+  } catch {
+    return currencyCode || '$';
+  }
+}
+
+export function formatCurrency(amount: number, currencyCode: string = 'USD'): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode || 'USD',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    const symbol = getCurrencySymbol(currencyCode);
+    return `${symbol} ${amount.toLocaleString()}`;
+  }
 }
 
 export function getTodayDateString(): string {

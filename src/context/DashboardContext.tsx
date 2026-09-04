@@ -99,6 +99,8 @@ interface DashboardContextType {
   importGoogleEventToAcademic: (gEvent: GoogleCalendarEvent) => Promise<void>;
 
   // Finance actions
+  currency: string;
+  setCurrency: (newCurrency: string) => Promise<void>;
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   updateBudget: (newBudget: number) => Promise<void>;
@@ -133,6 +135,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [events, setEvents] = useState<AcademicEvent[]>(initialData.events);
   const [transactions, setTransactions] = useState<Transaction[]>(initialData.transactions);
   const [budget, setBudget] = useState<number>(initialData.budget);
+  const [currency, setCurrencyState] = useState<string>(initialData.currency || 'USD');
   const [habits, setHabits] = useState<Record<string, HabitRecord>>(initialData.habits);
   const [milestones, setMilestones] = useState<LearningMilestone[]>(initialData.milestones);
   const [userProfile, setUserProfile] = useState<UserProfile>(
@@ -233,7 +236,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             batch.set(ref, h);
           });
 
-          batch.set(settingsRef, { monthlyBudget: budgetToSync, currency: 'INR' });
+          const currencyToSync = currency || activeLocal.currency || 'USD';
+          batch.set(settingsRef, { monthlyBudget: budgetToSync, currency: currencyToSync }, { merge: true });
           batch.set(profileDocRef, { ...profileToSync, updatedAt: new Date().toISOString() }, { merge: true });
           batch.set(userDocRef, { profile: profileToSync }, { merge: true });
 
@@ -392,6 +396,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             const b = Number(data.monthlyBudget);
             setBudget(b);
             saveLocalData(user.uid, { budget: b });
+          }
+          if (data.currency !== undefined && typeof data.currency === 'string') {
+            const c = data.currency.trim().toUpperCase();
+            if (c) {
+              setCurrencyState(c);
+              saveLocalData(user.uid, { currency: c });
+            }
           }
         }
         setLoading(false);
@@ -646,6 +657,23 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         await deleteDoc(ref);
       } catch (err: any) {
         console.warn('Firestore deleteTransaction warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
+  const setCurrency = async (newCurrency: string) => {
+    const code = (newCurrency || 'USD').trim().toUpperCase();
+    setSyncStatus('saving');
+    setCurrencyState(code);
+    saveLocalData(userId, { currency: code });
+
+    if (user?.uid) {
+      try {
+        const ref = doc(db, 'users', user.uid, 'settings', 'finance');
+        await setDoc(ref, { currency: code, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err: any) {
+        console.warn('Firestore setCurrency warning:', err?.message || err);
       }
     }
     setSyncStatus('synced');
@@ -1142,6 +1170,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         syncAcademicEventToGCal,
         syncAllDeadlinesToGCal,
         importGoogleEventToAcademic,
+        currency,
+        setCurrency,
         addTransaction,
         deleteTransaction,
         updateBudget,
