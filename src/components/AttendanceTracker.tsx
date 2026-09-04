@@ -857,7 +857,7 @@ export const AttendanceTracker: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Dr. Aditi Togya"
+                  placeholder="e.g. Dr. Alex Morgan"
                   value={formData.professor}
                   onChange={(e) => setFormData({ ...formData, professor: e.target.value })}
                   className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-indigo-500"

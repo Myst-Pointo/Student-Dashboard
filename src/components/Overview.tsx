@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { calculateAttendanceStats, calculateDualAttendance, formatCurrency, getTodayDateString } from '../utils/dashboardUtils';
-import { WEEKLY_CLASS_SCHEDULE } from '../data/academicData';
 
 export const Overview: React.FC = () => {
   const {
@@ -26,6 +25,7 @@ export const Overview: React.FC = () => {
     events,
     habits,
     milestones,
+    classSchedule,
     setActiveTab,
     openQuickAction,
     recordAttendance,
@@ -66,13 +66,6 @@ export const Overview: React.FC = () => {
       else expenseByCategory['Other'] += tx.amount;
     });
 
-  // Default display fallbacks if no transactions yet logged for this month
-  if (monthlyExpenses === 0) {
-    expenseByCategory['Food & Dining'] = 2400;
-    expenseByCategory['Commute'] = 950;
-    expenseByCategory['Books & Stationery'] = 1200;
-  }
-
   // 3. Upcoming Deadlines (next 7 days)
   const now = new Date();
   const next7Days = new Date();
@@ -102,7 +95,7 @@ export const Overview: React.FC = () => {
   // Today's Day of week & Class Schedule
   const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDayName = daysMap[now.getDay()];
-  const todaysClasses = WEEKLY_CLASS_SCHEDULE.filter((c) => c.day === currentDayName);
+  const todaysClasses = (classSchedule || []).filter((c) => c.day === currentDayName);
 
   // Active learning milestone
   const activeMilestone = milestones.find((m) => m.status === 'In Progress') || {
@@ -326,39 +319,40 @@ export const Overview: React.FC = () => {
               {todaysClasses.length > 0 ? (
                 todaysClasses.map((item, idx) => {
                   const borderClass =
-                    idx === 0
+                    idx % 3 === 0
                       ? 'border-indigo-500'
-                      : idx === 1
-                      ? 'border-zinc-700 opacity-70'
-                      : 'border-rose-500';
+                      : idx % 3 === 1
+                      ? 'border-sky-500'
+                      : 'border-emerald-500';
                   const timeTextClass =
-                    idx === 0 ? 'text-indigo-400' : idx === 1 ? 'text-zinc-500' : 'text-rose-400';
+                    idx % 3 === 0 ? 'text-indigo-400' : idx % 3 === 1 ? 'text-sky-400' : 'text-emerald-400';
 
                   return (
-                    <div key={idx} className={`border-l-2 ${borderClass} pl-3 py-1`}>
-                      <p className={timeTextClass}>{item.timeSlot || '09:00 AM - 10:30 AM'}</p>
+                    <div key={item.id || idx} className={`border-l-2 ${borderClass} pl-3 py-1`}>
+                      <div className="flex items-center justify-between">
+                        <p className={timeTextClass}>{item.timeSlot || 'Scheduled Time'}</p>
+                        {item.room && (
+                          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-800/60 px-1.5 py-0.5 rounded">
+                            {item.room}
+                          </span>
+                        )}
+                      </div>
                       <p className="font-bold text-sm text-zinc-200 font-sans mt-0.5">{item.subject}</p>
-                      <p className="text-zinc-500 text-[10px]">{item.faculty}</p>
+                      {item.faculty && <p className="text-zinc-500 text-[10px] font-sans">{item.faculty}</p>}
                     </div>
                   );
                 })
               ) : (
-                <div className="space-y-3">
-                  <div className="border-l-2 border-indigo-500 pl-3 py-1">
-                    <p className="text-indigo-400">09:00 AM - 10:30 AM</p>
-                    <p className="font-bold text-sm text-zinc-200 font-sans mt-0.5">Microeconomics</p>
-                    <p className="text-zinc-500 text-[10px]">Dr. Aditi Togya</p>
-                  </div>
-                  <div className="border-l-2 border-zinc-700 pl-3 py-1 opacity-70">
-                    <p className="text-zinc-500">11:00 AM - 12:30 PM</p>
-                    <p className="font-bold text-sm text-zinc-200 font-sans mt-0.5">Psychology</p>
-                    <p className="text-zinc-500 text-[10px]">Dr. Yogeshwari Phatak</p>
-                  </div>
-                  <div className="border-l-2 border-rose-500 pl-3 py-1">
-                    <p className="text-rose-400">01:30 PM - 03:00 PM</p>
-                    <p className="font-bold text-sm text-zinc-200 font-sans mt-0.5">Public Finance</p>
-                    <p className="text-zinc-500 text-[10px]">Ms. Manisha Shaktawat</p>
-                  </div>
+                <div className="py-6 text-center">
+                  <Clock className="w-5 h-5 mx-auto text-zinc-600 mb-2" />
+                  <p className="text-zinc-400 font-sans text-xs">No classes scheduled for {currentDayName}</p>
+                  <button
+                    onClick={() => setActiveTab('planner')}
+                    className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors inline-flex items-center gap-1 font-sans"
+                  >
+                    <span>Manage weekly schedule</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
               )}
             </div>

@@ -22,11 +22,11 @@ import {
   Pencil,
   RotateCcw,
   Sparkles,
+  MapPin,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
-import { AcademicEvent, EventCategory, OfficialAcademicMilestone, Priority } from '../types';
+import { AcademicEvent, ClassScheduleItem, DayOfWeek, EventCategory, OfficialAcademicMilestone, Priority } from '../types';
 import { isDueWithin48Hours } from '../utils/dashboardUtils';
-import { WEEKLY_CLASS_SCHEDULE } from '../data/academicData';
 import { GoogleCalendarView } from './GoogleCalendarView';
 
 export const AcademicPlanner: React.FC = () => {
@@ -43,6 +43,11 @@ export const AcademicPlanner: React.FC = () => {
     updateOfficialMilestone,
     deleteOfficialMilestone,
     resetOfficialMilestones,
+    classSchedule,
+    addClassScheduleItem,
+    updateClassScheduleItem,
+    deleteClassScheduleItem,
+    subjects,
   } = useDashboard();
 
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly'>('monthly');
@@ -63,6 +68,23 @@ export const AcademicPlanner: React.FC = () => {
     isHighlighted: false,
   });
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  // Weekly Schedule Modal state
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingScheduleItem, setEditingScheduleItem] = useState<ClassScheduleItem | null>(null);
+  const [scheduleForm, setScheduleForm] = useState<{
+    subject: string;
+    faculty: string;
+    day: DayOfWeek;
+    timeSlot: string;
+    room: string;
+  }>({
+    subject: '',
+    faculty: '',
+    day: 'Monday',
+    timeSlot: '09:00 AM - 10:30 AM',
+    room: '',
+  });
 
   // Month navigation
   const [currentDate, setCurrentDate] = useState<Date>(new Date('2026-09-01'));
@@ -582,34 +604,163 @@ export const AcademicPlanner: React.FC = () => {
 
       {/* Subtab 2: Weekly Schedule Timetable */}
       {activeSubTab === 'timetable' && (
-        <div className="bg-[#18181b] border border-[#27272a] rounded-lg p-4">
-          <div className="mb-4">
-            <h3 className="text-xs font-black uppercase text-zinc-500 tracking-widest">
-              Weekly Class Timetable
-            </h3>
-            <p className="text-[11px] text-zinc-500">Regular college lecture hours (Monday to Saturday)</p>
+        <div className="bg-[#18181b] border border-[#27272a] rounded-lg p-5 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27272a]/80 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold uppercase text-zinc-200 tracking-wider">
+                  Weekly Class Timetable
+                </h3>
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">
+                  Editable Schedule
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Customize weekly lecture hours, professors, timings, days, and rooms.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingScheduleItem(null);
+                  setScheduleForm({
+                    subject: '',
+                    faculty: '',
+                    day: 'Monday',
+                    timeSlot: '09:00 AM - 10:30 AM',
+                    room: '',
+                  });
+                  setScheduleModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 rounded-md transition-all shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Lecture
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const).map((day) => {
-              const dayClasses = WEEKLY_CLASS_SCHEDULE.filter((c) => c.day === day);
+              const dayClasses = (classSchedule || []).filter((c) => c.day === day);
               return (
-                <div key={day} className="p-3 rounded bg-zinc-900/70 border border-[#27272a] space-y-2">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-[#27272a]">
-                    <span className="text-xs font-bold text-indigo-400 uppercase font-mono">{day}</span>
-                    <span className="text-[10px] font-mono text-zinc-500">{dayClasses.length} lectures</span>
+                <div key={day} className="p-3.5 rounded-lg bg-zinc-900/70 border border-[#27272a] flex flex-col justify-between space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#27272a]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-indigo-400 uppercase font-mono">{day}</span>
+                      <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/80 px-1.5 py-0.2 rounded">
+                        {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingScheduleItem(null);
+                        setScheduleForm({
+                          subject: '',
+                          faculty: '',
+                          day: day,
+                          timeSlot: '09:00 AM - 10:30 AM',
+                          room: '',
+                        });
+                        setScheduleModalOpen(true);
+                      }}
+                      className="text-[11px] text-zinc-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1 transition-colors"
+                      title={`Add class to ${day}`}
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
                   </div>
 
-                  <div className="space-y-1.5 font-mono text-[11px]">
-                    {dayClasses.map((item, idx) => (
-                      <div key={idx} className="p-2 rounded bg-[#18181b] border border-[#27272a] space-y-0.5">
-                        <div className="text-xs font-bold text-zinc-200 font-sans">{item.subject}</div>
-                        <div className="text-[10px] text-zinc-500 flex items-center justify-between">
-                          <span>{item.faculty}</span>
-                          <span className="text-indigo-400">{item.timeSlot}</span>
+                  <div className="space-y-2 font-mono text-[11px] flex-1">
+                    {dayClasses.length > 0 ? (
+                      dayClasses.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-2.5 rounded-md bg-[#18181b] border border-[#27272a] hover:border-zinc-600 transition-colors group relative space-y-1"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-bold text-zinc-100 font-sans leading-snug">
+                              {item.subject}
+                            </span>
+                            <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingScheduleItem(item);
+                                  setScheduleForm({
+                                    subject: item.subject,
+                                    faculty: item.faculty || '',
+                                    day: item.day,
+                                    timeSlot: item.timeSlot,
+                                    room: item.room || '',
+                                  });
+                                  setScheduleModalOpen(true);
+                                }}
+                                className="p-1 text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800 rounded transition-colors"
+                                title="Edit lecture"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteClassScheduleItem(item.id)}
+                                className="p-1 text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 rounded transition-colors"
+                                title="Delete lecture"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-indigo-400 text-[10px]">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span>{item.timeSlot}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-0.5">
+                            {item.faculty ? (
+                              <span className="flex items-center gap-1 font-sans text-zinc-400 truncate">
+                                <User className="w-3 h-3 shrink-0 text-zinc-500" />
+                                {item.faculty}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600 italic font-sans">No faculty specified</span>
+                            )}
+                            {item.room && (
+                              <span className="flex items-center gap-0.5 bg-zinc-800/80 px-1.5 py-0.2 rounded text-[9px] text-zinc-400">
+                                <MapPin className="w-2.5 h-2.5 text-zinc-500" />
+                                {item.room}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="py-6 px-3 border border-dashed border-zinc-800 rounded text-center">
+                        <p className="text-zinc-500 text-[11px] font-sans">No classes scheduled</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingScheduleItem(null);
+                            setScheduleForm({
+                              subject: '',
+                              faculty: '',
+                              day: day,
+                              timeSlot: '09:00 AM - 10:30 AM',
+                              room: '',
+                            });
+                            setScheduleModalOpen(true);
+                          }}
+                          className="mt-1.5 text-[10px] text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add lecture
+                        </button>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               );
@@ -1015,6 +1166,171 @@ export const AcademicPlanner: React.FC = () => {
                   className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
                 >
                   {editingMilestone ? 'Save Milestone' : 'Add Milestone'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Weekly Class Schedule Modal */}
+      {scheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-[#18181b] border border-[#27272a] rounded-xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-zinc-100 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-400" />
+                  {editingScheduleItem ? 'Edit Class / Lecture' : 'Add Class / Lecture'}
+                </h4>
+                <p className="text-[11px] text-zinc-400">
+                  Configure subject, timing, day, room, and optional professor.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!scheduleForm.subject.trim() || !scheduleForm.timeSlot.trim()) return;
+                if (editingScheduleItem) {
+                  await updateClassScheduleItem(editingScheduleItem.id, {
+                    subject: scheduleForm.subject.trim(),
+                    faculty: scheduleForm.faculty.trim() || undefined,
+                    day: scheduleForm.day,
+                    timeSlot: scheduleForm.timeSlot.trim(),
+                    room: scheduleForm.room.trim() || undefined,
+                  });
+                } else {
+                  await addClassScheduleItem({
+                    subject: scheduleForm.subject.trim(),
+                    faculty: scheduleForm.faculty.trim() || undefined,
+                    day: scheduleForm.day,
+                    timeSlot: scheduleForm.timeSlot.trim(),
+                    room: scheduleForm.room.trim() || undefined,
+                  });
+                }
+                setScheduleModalOpen(false);
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="block font-semibold text-zinc-300 mb-1">
+                  Subject Name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Data Structures, Physics, Economics"
+                  value={scheduleForm.subject}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, subject: e.target.value })}
+                  list="subjects-datalist"
+                  className="w-full px-3 py-2 rounded-lg bg-[#09090b] border border-[#27272a] text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-indigo-500"
+                />
+                <datalist id="subjects-datalist">
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-300 mb-1">
+                    Day of Week <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={scheduleForm.day}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, day: e.target.value as DayOfWeek })}
+                    className="w-full px-3 py-2 rounded-lg bg-[#09090b] border border-[#27272a] text-zinc-100 focus:outline-hidden focus:border-indigo-500 font-sans"
+                  >
+                    {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const).map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-300 mb-1">
+                    Room / Location (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 204, Lab 3"
+                    value={scheduleForm.room}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, room: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-[#09090b] border border-[#27272a] text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-indigo-500 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-300 mb-1">
+                  Time Slot <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 09:00 AM - 10:30 AM"
+                  value={scheduleForm.timeSlot}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, timeSlot: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-[#09090b] border border-[#27272a] text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-indigo-500 font-mono text-xs"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {[
+                    '09:00 AM - 10:30 AM',
+                    '10:30 AM - 12:00 PM',
+                    '11:00 AM - 12:30 PM',
+                    '01:30 PM - 03:00 PM',
+                    '03:00 PM - 04:30 PM',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setScheduleForm({ ...scheduleForm, timeSlot: preset })}
+                      className="px-2 py-0.5 text-[10px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 rounded transition-colors"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-300 mb-1">
+                  Professor / Faculty (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Prof. Johnson"
+                  value={scheduleForm.faculty}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, faculty: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-[#09090b] border border-[#27272a] text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#27272a]">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+                >
+                  {editingScheduleItem ? 'Save Lecture' : 'Add Lecture'}
                 </button>
               </div>
             </form>

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TabType } from '../types';
 import { useDashboard } from '../context/DashboardContext';
+import { formatCurrency } from '../utils/dashboardUtils';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -26,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     userId,
     subjects,
     budget,
+    currency,
     transactions,
     isGoogleConnected,
     googleUserName,
@@ -76,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       id: 'finance',
       label: 'Student Finance',
       icon: Wallet,
-      badge: remainingBudget >= 0 ? `$${remainingBudget}` : `-$${Math.abs(remainingBudget)}`,
+      badge: formatCurrency(remainingBudget, currency),
       badgeColor: remainingBudget >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20',
     },
     {
@@ -231,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
                 <p className="text-xs font-semibold text-zinc-200 truncate group-hover:text-indigo-300 transition-colors">
-                  {userProfile?.displayName || googleUserName || 'Academic Student'}
+                  {userProfile?.displayName || googleUserName || 'Student'}
                 </p>
                 <Settings className="w-3 h-3 text-zinc-500 group-hover:text-indigo-400 shrink-0" />
               </div>

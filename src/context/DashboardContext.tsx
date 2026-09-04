@@ -13,6 +13,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db, googleSignIn, logoutGoogle, getAccessToken } from '../firebase';
 import {
   AcademicEvent,
+  ClassScheduleItem,
   GoogleCalendarEvent,
   GoogleCalendarEventInput,
   GoogleCalendarItem,
@@ -51,6 +52,7 @@ interface DashboardContextType {
   milestones: LearningMilestone[];
   userProfile: UserProfile;
   officialMilestones: OfficialAcademicMilestone[];
+  classSchedule: ClassScheduleItem[];
   loading: boolean;
   syncStatus: 'synced' | 'saving' | 'offline';
 
@@ -58,6 +60,12 @@ interface DashboardContextType {
   updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
   profileModalOpen: boolean;
   setProfileModalOpen: (open: boolean) => void;
+
+  // Class Schedule actions
+  addClassScheduleItem: (item: Omit<ClassScheduleItem, 'id'>) => Promise<void>;
+  updateClassScheduleItem: (id: string, updates: Partial<ClassScheduleItem>) => Promise<void>;
+  deleteClassScheduleItem: (id: string) => Promise<void>;
+  saveWeeklySchedule: (items: ClassScheduleItem[]) => Promise<void>;
 
   // Official Milestones
   addOfficialMilestone: (item: Omit<OfficialAcademicMilestone, 'id'>) => Promise<void>;
@@ -144,6 +152,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [officialMilestones, setOfficialMilestones] = useState<OfficialAcademicMilestone[]>(
     initialData.officialMilestones || INITIAL_OFFICIAL_MILESTONES
   );
+  const [classSchedule, setClassSchedule] = useState<ClassScheduleItem[]>(
+    initialData.classSchedule || []
+  );
 
   // Profile modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -180,6 +191,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const habitsRef = collection(userDocRef, 'habits');
     const milestonesRef = collection(userDocRef, 'milestones');
     const officialMilestonesRef = collection(userDocRef, 'officialMilestones');
+    const classScheduleRef = collection(userDocRef, 'classSchedule');
     const settingsRef = doc(userDocRef, 'settings', 'finance');
     const profileDocRef = doc(userDocRef, 'settings', 'profile');
 
@@ -199,6 +211,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           const txToSync = transactions.length > 0 ? transactions : activeLocal.transactions;
           const msToSync = milestones.length > 0 ? milestones : activeLocal.milestones;
           const officialMsToSync = officialMilestones.length > 0 ? officialMilestones : (activeLocal.officialMilestones || INITIAL_OFFICIAL_MILESTONES);
+          const scheduleToSync = classSchedule.length > 0 ? classSchedule : (activeLocal.classSchedule || []);
           const habitsToSync = Object.keys(habits).length > 0 ? habits : activeLocal.habits;
           const budgetToSync = budget || activeLocal.budget;
           const profileToSync = {
@@ -229,6 +242,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           officialMsToSync.forEach((om) => {
             const ref = doc(officialMilestonesRef, om.id);
             batch.set(ref, { ...om, updatedAt: new Date().toISOString() });
+          });
+
+          scheduleToSync.forEach((cs) => {
+            const ref = doc(classScheduleRef, cs.id);
+            batch.set(ref, { ...cs, updatedAt: new Date().toISOString() });
           });
 
           Object.entries(habitsToSync).forEach(([dateStr, h]) => {
@@ -275,13 +293,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         const list: Subject[] = [];
         snapshot.forEach((d) => {
-          list.push({ id: d.id, ...(d.data() as Omit<Subject, 'id'>) });
+          const data = d.data() as Omit<Subject, 'id'>;
+          const prof = (data.professor || '').toLowerCase();
+          const name = (data.name || '').toLowerCase();
+          const isPersonalProf =
+            prof.includes('togya') ||
+            prof.includes('phatak') ||
+            prof.includes('shaktawat') ||
+            prof.includes('pahuja') ||
+            prof.includes('sirwaiya') ||
+            prof.includes('dubey');
+          const isPersonalSubject =
+            name.includes('microeconomics') ||
+            name.includes('public finance') ||
+            name.includes('computer fundamentals') ||
+            name.includes('basic mathematics') ||
+            name.includes('psychology');
+          if (!isPersonalProf && !isPersonalSubject) {
+            list.push({ id: d.id, ...data });
+          } else {
+            deleteDoc(doc(subjectsRef, d.id)).catch(() => {});
+          }
         });
         list.sort((a, b) => a.name.localeCompare(b.name));
-        if (list.length > 0) {
-          setSubjects(list);
-          saveLocalData(user.uid, { subjects: list });
-        }
+        setSubjects(list);
+        saveLocalData(user.uid, { subjects: list });
       },
       (err) => {
         if (err?.code === 'permission-denied') {
@@ -298,13 +334,31 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         const list: AcademicEvent[] = [];
         snapshot.forEach((d) => {
-          list.push({ id: d.id, ...(d.data() as Omit<AcademicEvent, 'id'>) });
+          const data = d.data() as Omit<AcademicEvent, 'id'>;
+          const title = (data.title || '').toLowerCase();
+          const notes = (data.notes || '').toLowerCase();
+          const text = `${title} ${notes}`;
+          const isVoided =
+            text.includes('sfoorti') ||
+            text.includes('diwali') ||
+            text.includes('youth festival') ||
+            text.includes('induction') ||
+            text.includes('admission') ||
+            text.includes('registration') ||
+            text.includes('preparation leave') ||
+            text.includes('semester break') ||
+            text.includes('feed back') ||
+            text.includes('declaration of final result') ||
+            text.includes('class test');
+          if (!isVoided) {
+            list.push({ id: d.id, ...data });
+          } else {
+            deleteDoc(doc(eventsRef, d.id)).catch(() => {});
+          }
         });
         list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        if (list.length > 0) {
-          setEvents(list);
-          saveLocalData(user.uid, { events: list });
-        }
+        setEvents(list);
+        saveLocalData(user.uid, { events: list });
       },
       (err) => {
         if (err?.code === 'permission-denied') {
@@ -423,8 +477,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         if (docSnap.exists()) {
           const data = docSnap.data() as UserProfile;
+          let name = (data.displayName || '').trim();
+          if (!name || name.toLowerCase().includes('shira') || name.toLowerCase().includes('raghuwanshi')) {
+            name = 'Student';
+            setDoc(profileDocRef, { displayName: 'Student' }, { merge: true }).catch(() => {});
+          }
           setUserProfile((prev) => {
-            const merged = { ...prev, ...data };
+            const merged = { ...prev, ...data, displayName: name };
             saveLocalData(user.uid, { userProfile: merged });
             return merged;
           });
@@ -445,18 +504,80 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         const list: OfficialAcademicMilestone[] = [];
         snapshot.forEach((d) => {
-          list.push({ id: d.id, ...(d.data() as Omit<OfficialAcademicMilestone, 'id'>) });
+          const data = d.data() as Omit<OfficialAcademicMilestone, 'id'>;
+          const title = (data.title || '').toLowerCase();
+          const sem1 = (data.semester1 || '').toLowerCase();
+          const sem2 = (data.semester2 || '').toLowerCase();
+          const text = `${title} ${sem1} ${sem2}`;
+          const isVoided =
+            text.includes('sfoorti') ||
+            text.includes('diwali') ||
+            text.includes('youth festival') ||
+            text.includes('induction') ||
+            text.includes('admission') ||
+            text.includes('registration') ||
+            text.includes('preparation leave') ||
+            text.includes('semester break') ||
+            text.includes('feed back') ||
+            text.includes('declaration of final result') ||
+            text.includes('class test') ||
+            text.includes('start date of admission') ||
+            text.includes('end date of admission') ||
+            text.includes('start date of semester classes') ||
+            text.includes('end date of semester classes');
+          if (!isVoided) {
+            list.push({ id: d.id, ...data });
+          } else {
+            deleteDoc(doc(officialMilestonesRef, d.id)).catch(() => {});
+          }
         });
-        if (list.length > 0) {
-          setOfficialMilestones(list);
-          saveLocalData(user.uid, { officialMilestones: list });
-        }
+        setOfficialMilestones(list);
+        saveLocalData(user.uid, { officialMilestones: list });
       },
       (err) => {
         if (err?.code === 'permission-denied') {
           console.info('Official Milestones sync running in local-first mode');
         } else {
           console.info('Official Milestones snapshot notice:', err.message);
+        }
+      }
+    );
+
+    const unsubClassSchedule = onSnapshot(
+      classScheduleRef,
+      (snapshot) => {
+        if (!isMounted) return;
+        const list: ClassScheduleItem[] = [];
+        snapshot.forEach((d) => {
+          const data = d.data() as Omit<ClassScheduleItem, 'id'>;
+          const fac = (data.faculty || '').toLowerCase();
+          const sub = (data.subject || '').toLowerCase();
+          const isVoided =
+            fac.includes('togya') ||
+            fac.includes('phatak') ||
+            fac.includes('shaktawat') ||
+            fac.includes('pahuja') ||
+            fac.includes('sirwaiya') ||
+            fac.includes('dubey') ||
+            sub.includes('microeconomics') ||
+            sub.includes('public finance') ||
+            sub.includes('computer fundamentals') ||
+            sub.includes('basic mathematics') ||
+            sub.includes('psychology');
+          if (!isVoided) {
+            list.push({ id: d.id, ...data });
+          } else {
+            deleteDoc(doc(classScheduleRef, d.id)).catch(() => {});
+          }
+        });
+        setClassSchedule(list);
+        saveLocalData(user.uid, { classSchedule: list });
+      },
+      (err) => {
+        if (err?.code === 'permission-denied') {
+          console.info('Class schedule sync running in local-first mode');
+        } else {
+          console.info('Class schedule snapshot notice:', err.message);
         }
       }
     );
@@ -471,6 +592,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       unsubSettings();
       unsubProfile();
       unsubOfficialMilestones();
+      unsubClassSchedule();
     };
   }, [user]);
 
@@ -958,6 +1080,89 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus('synced');
   };
 
+  // Class Schedule Actions
+  const addClassScheduleItem = async (item: Omit<ClassScheduleItem, 'id'>) => {
+    setSyncStatus('saving');
+    const newId = `cs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newItem: ClassScheduleItem = {
+      ...item,
+      id: newId,
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [...classSchedule, newItem];
+    setClassSchedule(updated);
+    saveLocalData(userId, { classSchedule: updated });
+
+    if (user?.uid) {
+      try {
+        const ref = doc(db, 'users', user.uid, 'classSchedule', newId);
+        await setDoc(ref, newItem);
+      } catch (err: any) {
+        console.warn('Firestore addClassScheduleItem warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
+  const updateClassScheduleItem = async (id: string, updates: Partial<ClassScheduleItem>) => {
+    setSyncStatus('saving');
+    const updated = classSchedule.map((c) =>
+      c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+    );
+    setClassSchedule(updated);
+    saveLocalData(userId, { classSchedule: updated });
+
+    if (user?.uid) {
+      try {
+        const ref = doc(db, 'users', user.uid, 'classSchedule', id);
+        await setDoc(ref, { ...updates, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err: any) {
+        console.warn('Firestore updateClassScheduleItem warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
+  const deleteClassScheduleItem = async (id: string) => {
+    setSyncStatus('saving');
+    const updated = classSchedule.filter((c) => c.id !== id);
+    setClassSchedule(updated);
+    saveLocalData(userId, { classSchedule: updated });
+
+    if (user?.uid) {
+      try {
+        const ref = doc(db, 'users', user.uid, 'classSchedule', id);
+        await deleteDoc(ref);
+      } catch (err: any) {
+        console.warn('Firestore deleteClassScheduleItem warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
+  const saveWeeklySchedule = async (items: ClassScheduleItem[]) => {
+    setSyncStatus('saving');
+    setClassSchedule(items);
+    saveLocalData(userId, { classSchedule: items });
+
+    if (user?.uid) {
+      try {
+        const batch = writeBatch(db);
+        const colRef = collection(db, 'users', user.uid, 'classSchedule');
+        const snap = await getDocs(colRef);
+        snap.forEach((d) => batch.delete(d.ref));
+        items.forEach((item) => {
+          const ref = doc(colRef, item.id);
+          batch.set(ref, item);
+        });
+        await batch.commit();
+      } catch (err: any) {
+        console.warn('Firestore saveWeeklySchedule warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
   // Google Calendar state
   const [googleToken, setGoogleToken] = useState<string | null>(null);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendarItem[]>([]);
@@ -1134,11 +1339,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         milestones,
         userProfile,
         officialMilestones,
+        classSchedule,
         loading,
         syncStatus,
         updateUserProfile,
         profileModalOpen,
         setProfileModalOpen,
+        addClassScheduleItem,
+        updateClassScheduleItem,
+        deleteClassScheduleItem,
+        saveWeeklySchedule,
         addOfficialMilestone,
         updateOfficialMilestone,
         deleteOfficialMilestone,

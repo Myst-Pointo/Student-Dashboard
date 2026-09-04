@@ -1,6 +1,7 @@
 // Persistent Local Storage for Academic & Life Dashboard
 import {
   AcademicEvent,
+  ClassScheduleItem,
   HabitRecord,
   LearningMilestone,
   OfficialAcademicMilestone,
@@ -32,11 +33,13 @@ export interface StoredDashboardData {
   milestones: LearningMilestone[];
   userProfile: UserProfile;
   officialMilestones: OfficialAcademicMilestone[];
+  classSchedule: ClassScheduleItem[];
   lastUpdated: string;
 }
 
-const PRIMARY_STORAGE_KEY = 'academic_dashboard_student_v4';
+const PRIMARY_STORAGE_KEY = 'academic_dashboard_student_v5';
 const LEGACY_STORAGE_KEYS = [
+  'academic_dashboard_student_v4',
   'academic_dashboard_student_v3',
   'academic_life_dashboard_global_store_v2',
   'academic_life_dashboard_global_store',
@@ -56,6 +59,7 @@ export function getDefaultDashboardData(): StoredDashboardData {
     milestones: [],
     userProfile: DEFAULT_USER_PROFILE,
     officialMilestones: [],
+    classSchedule: [],
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -91,14 +95,24 @@ function sanitizeCurrency(currency: any): string {
 
 function filterPersonalData(subjects: Subject[]): Subject[] {
   if (!Array.isArray(subjects)) return [];
-  // Ensure personal professors or subjects from earlier development testing are purged
+  // Ensure personal professors or subjects from earlier initial prompt are completely purged
   return subjects.filter((s) => {
     const prof = (s.professor || '').toLowerCase();
-    return !prof.includes('togya') &&
-      !prof.includes('phatak') &&
-      !prof.includes('shaktawat') &&
-      !prof.includes('pahuja') &&
-      !prof.includes('sirwaiya');
+    const name = (s.name || '').toLowerCase();
+    const isPersonalProf =
+      prof.includes('togya') ||
+      prof.includes('phatak') ||
+      prof.includes('shaktawat') ||
+      prof.includes('pahuja') ||
+      prof.includes('sirwaiya') ||
+      prof.includes('dubey');
+    const isPersonalSubject =
+      name.includes('microeconomics') ||
+      name.includes('public finance') ||
+      name.includes('computer fundamentals') ||
+      name.includes('basic mathematics') ||
+      name.includes('psychology');
+    return !isPersonalProf && !isPersonalSubject;
   });
 }
 
@@ -107,7 +121,20 @@ function filterPersonalEvents(events: AcademicEvent[]): AcademicEvent[] {
   return events.filter((e) => {
     const title = (e.title || '').toLowerCase();
     const notes = (e.notes || '').toLowerCase();
-    return !title.includes('sfoorti') && !notes.includes('sfoorti');
+    const text = `${title} ${notes}`;
+    return (
+      !text.includes('sfoorti') &&
+      !text.includes('diwali') &&
+      !text.includes('youth festival') &&
+      !text.includes('induction') &&
+      !text.includes('admission') &&
+      !text.includes('registration') &&
+      !text.includes('preparation leave') &&
+      !text.includes('semester break') &&
+      !text.includes('feed back') &&
+      !text.includes('declaration of final result') &&
+      !text.includes('class test')
+    );
   });
 }
 
@@ -115,10 +142,52 @@ function sanitizeOfficialMilestones(milestones: any): OfficialAcademicMilestone[
   if (Array.isArray(milestones) && milestones.length > 0) {
     return milestones.filter((m) => {
       const title = (m.title || '').toLowerCase();
-      return !title.includes('sfoorti') && !title.includes('diwali vacations');
+      const sem1 = (m.semester1 || '').toLowerCase();
+      const sem2 = (m.semester2 || '').toLowerCase();
+      const text = `${title} ${sem1} ${sem2}`;
+      return (
+        !text.includes('sfoorti') &&
+        !text.includes('diwali') &&
+        !text.includes('youth festival') &&
+        !text.includes('induction') &&
+        !text.includes('admission') &&
+        !text.includes('registration') &&
+        !text.includes('preparation leave') &&
+        !text.includes('semester break') &&
+        !text.includes('feed back') &&
+        !text.includes('declaration of final result') &&
+        !text.includes('class test') &&
+        !text.includes('start date of admission') &&
+        !text.includes('end date of admission') &&
+        !text.includes('start date of semester classes') &&
+        !text.includes('end date of semester classes')
+      );
     });
   }
   return [];
+}
+
+function filterPersonalClassSchedule(schedule: any): ClassScheduleItem[] {
+  if (!Array.isArray(schedule)) return [];
+  return schedule.filter((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const fac = (item.faculty || '').toLowerCase();
+    const sub = (item.subject || '').toLowerCase();
+    const isPersonalProf =
+      fac.includes('togya') ||
+      fac.includes('phatak') ||
+      fac.includes('shaktawat') ||
+      fac.includes('pahuja') ||
+      fac.includes('sirwaiya') ||
+      fac.includes('dubey');
+    const isPersonalSubject =
+      sub.includes('microeconomics') ||
+      sub.includes('public finance') ||
+      sub.includes('computer fundamentals') ||
+      sub.includes('basic mathematics') ||
+      sub.includes('psychology');
+    return !isPersonalProf && !isPersonalSubject;
+  });
 }
 
 /**
@@ -146,6 +215,7 @@ export function loadLocalData(userId?: string): StoredDashboardData {
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
           userProfile: sanitizeUserProfile(parsed.userProfile),
           officialMilestones: sanitizeOfficialMilestones(parsed.officialMilestones),
+          classSchedule: filterPersonalClassSchedule(parsed.classSchedule),
           lastUpdated: parsed.lastUpdated || new Date().toISOString(),
         };
         memoryCache = validated;
@@ -169,6 +239,7 @@ export function loadLocalData(userId?: string): StoredDashboardData {
             milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
             userProfile: sanitizeUserProfile(parsed.userProfile),
             officialMilestones: sanitizeOfficialMilestones(parsed.officialMilestones),
+            classSchedule: filterPersonalClassSchedule(parsed.classSchedule),
             lastUpdated: parsed.lastUpdated || new Date().toISOString(),
           };
           memoryCache = validated;
@@ -194,6 +265,7 @@ export function loadLocalData(userId?: string): StoredDashboardData {
             milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
             userProfile: sanitizeUserProfile(parsed.userProfile),
             officialMilestones: sanitizeOfficialMilestones(parsed.officialMilestones),
+            classSchedule: filterPersonalClassSchedule(parsed.classSchedule),
             lastUpdated: parsed.lastUpdated || new Date().toISOString(),
           };
           memoryCache = validated;
@@ -252,6 +324,7 @@ export function saveLocalData(userId: string | undefined, data: Partial<StoredDa
       milestones: data.milestones !== undefined ? data.milestones : current.milestones,
       userProfile: data.userProfile !== undefined ? data.userProfile : current.userProfile,
       officialMilestones: data.officialMilestones !== undefined ? data.officialMilestones : current.officialMilestones,
+      classSchedule: data.classSchedule !== undefined ? filterPersonalClassSchedule(data.classSchedule) : current.classSchedule || [],
       lastUpdated: new Date().toISOString(),
     };
 

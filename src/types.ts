@@ -137,11 +137,16 @@ export interface LearningMilestone {
   updatedAt?: string;
 }
 
+export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
 export interface ClassScheduleItem {
-  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+  id: string;
+  day: DayOfWeek;
   subject: string;
-  faculty: string;
+  faculty?: string;
   timeSlot?: string;
+  room?: string;
+  updatedAt?: string;
 }
 
 export interface UserProfile {
