@@ -1,0 +1,6 @@
+{
+  "name": "Academic & Life Dashboard",
+  "description": "A comprehensive dark-mode personal life and academic dashboard with 75% dual attendance tracking, Google Calendar live integration and synchronization, student finance tracker in INR, and fitness goals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
