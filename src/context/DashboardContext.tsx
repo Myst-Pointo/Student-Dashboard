@@ -110,6 +110,7 @@ interface DashboardContextType {
   currency: string;
   setCurrency: (newCurrency: string) => Promise<void>;
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   updateBudget: (newBudget: number) => Promise<void>;
 
@@ -767,6 +768,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus('synced');
   };
 
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    setSyncStatus('saving');
+    const updated = transactions
+      .map((t) => (t.id === id ? { ...t, ...updates } : t))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    setTransactions(updated);
+    saveLocalData(userId, { transactions: updated });
+
+    if (user?.uid) {
+      try {
+        const ref = doc(db, 'users', user.uid, 'transactions', id);
+        await setDoc(ref, updates, { merge: true });
+      } catch (err: any) {
+        console.warn('Firestore updateTransaction warning:', err?.message || err);
+      }
+    }
+    setSyncStatus('synced');
+  };
+
   const deleteTransaction = async (id: string) => {
     setSyncStatus('saving');
     const updated = transactions.filter((t) => t.id !== id);
@@ -1383,6 +1403,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         currency,
         setCurrency,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
         updateBudget,
         toggleWorkout,

@@ -50,9 +50,11 @@ export const Overview: React.FC = () => {
 
   // Category breakdown for Finance Summary
   const expenseByCategory: Record<string, number> = {
+    'Essentials': 0,
     'Food & Dining': 0,
     'Commute': 0,
-    'Books & Stationery': 0,
+    'Books & Supplies': 0,
+    'Leisure & Fun': 0,
     'Other': 0,
   };
 
@@ -60,9 +62,11 @@ export const Overview: React.FC = () => {
     .filter((t) => t.type === 'expense')
     .forEach((tx) => {
       const cat = tx.category;
-      if (cat === 'Food') expenseByCategory['Food & Dining'] += tx.amount;
+      if (cat === 'Essentials') expenseByCategory['Essentials'] += tx.amount;
+      else if (cat === 'Food') expenseByCategory['Food & Dining'] += tx.amount;
       else if (cat === 'Commute') expenseByCategory['Commute'] += tx.amount;
-      else if (cat === 'Books') expenseByCategory['Books & Stationery'] += tx.amount;
+      else if (cat === 'Books') expenseByCategory['Books & Supplies'] += tx.amount;
+      else if (cat === 'Fun') expenseByCategory['Leisure & Fun'] += tx.amount;
       else expenseByCategory['Other'] += tx.amount;
     });
 
@@ -391,12 +395,18 @@ export const Overview: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              {Object.entries(expenseByCategory).slice(0, 3).map(([cat, amount]) => (
-                <div key={cat} className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-400">{cat}</span>
-                  <span className="font-bold text-zinc-200 font-mono">{formatCurrency(amount, currency)}</span>
-                </div>
-              ))}
+              {Object.entries(expenseByCategory)
+                .filter(([_, amount]) => amount > 0)
+                .slice(0, 4)
+                .map(([cat, amount]) => (
+                  <div key={cat} className="flex justify-between items-center text-xs">
+                    <span className="text-zinc-400">{cat}</span>
+                    <span className="font-bold text-zinc-200 font-mono">{formatCurrency(amount, currency)}</span>
+                  </div>
+                ))}
+              {Object.values(expenseByCategory).every((v) => v === 0) && (
+                <p className="text-[11px] text-zinc-500 font-mono italic">No expenses logged yet this month.</p>
+              )}
             </div>
           </section>
 

@@ -99,7 +99,7 @@ export interface GoogleCalendarEventInput {
   };
 }
 
-export type ExpenseCategory = 'Food' | 'Commute' | 'Books' | 'Fun' | 'Misc';
+export type ExpenseCategory = 'Essentials' | 'Food' | 'Commute' | 'Books' | 'Fun' | 'Misc';
 
 export interface Transaction {
   id: string;

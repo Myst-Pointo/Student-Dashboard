@@ -227,6 +227,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 onChange={(e) => setExpenseCat(e.target.value as ExpenseCategory)}
                 className="w-full px-3 py-2 rounded bg-[#09090b] border border-[#27272a] text-zinc-100 focus:outline-hidden focus:border-indigo-500"
               >
+                <option value="Essentials">Essentials (Rent, Mess, Bills)</option>
                 <option value="Food">Food & Dining</option>
                 <option value="Commute">Commute / Transit</option>
                 <option value="Books">Books & Supplies</option>
